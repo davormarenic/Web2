@@ -1,8 +1,8 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { auth as jwtAuth, requiredScopes } from 'express-oauth2-jwt-bearer';
-import { auth as oidcAuth, requiresAuth } from 'express-openid-connect';
-import QRCode from 'qrcode';
+import oidc from 'express-openid-connect';
+const { auth: oidcAuth, requiresAuth } = oidc;import QRCode from 'qrcode';
 import { pool } from './db.js';
 import 'dotenv/config';
 
