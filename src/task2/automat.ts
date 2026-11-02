@@ -1,5 +1,9 @@
 import { writeFile } from 'node:fs/promises';
 
+  type TokenResponse = {
+    access_token: string;
+  };
+
 export async function getToken(
   authority: string,
   audience: string,
@@ -11,9 +15,9 @@ export async function getToken(
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: new URLSearchParams({
+    body: JSON.stringify({
       grant_type: 'client_credentials',
       audience,
       client_id: clientId,
@@ -26,14 +30,9 @@ export async function getToken(
     throw new Error(`Token request failed with status ${response.status}`);
   }
 
-  const body: unknown = await response.json();
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('access_token' in body) ||
-    typeof body.access_token !== 'string'
-  ) {
-    throw new Error(`Token response failed with status ${response.status}`);
+  const body = (await response.json()) as TokenResponse;
+  if (!body.access_token) {
+    throw new Error('Token response is missing access_token');
   }
 
   return body.access_token;
@@ -63,7 +62,7 @@ export async function issuePass(
     throw new Error(`Pass response failed with status ${response.status}`);
   }
 
-  const identifier = new URL(location).pathname.split('/').filter(Boolean).pop();
+  const identifier = location.split('/').filter(Boolean).pop();
   if (!identifier) {
     throw new Error(`Pass response failed with status ${response.status}`);
   }

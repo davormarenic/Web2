@@ -1,7 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { auth as jwtAuth, requiredScopes } from 'express-oauth2-jwt-bearer';
-import { auth as oidcAuth } from 'express-openid-connect';
+import { auth as oidcAuth, requiresAuth } from 'express-openid-connect';
 import QRCode from 'qrcode';
 import { pool } from './db.js';
 import 'dotenv/config';
@@ -18,11 +18,14 @@ const getRequiredEnv = (name: string): string => {
 };
 
 const auth0Domain = getRequiredEnv('AUTH0_DOMAIN');
-const baseURL = process.env.PUBLIC_BASE_URL ?? `http://localhost:${port}`;
+const baseURL =
+  process.env.RENDER_EXTERNAL_URL ??
+  process.env.PUBLIC_BASE_URL ??
+  `http://localhost:${port}`;
 
 const oidcConfig = {
   authRequired: false,
-  auth0Logout: true,
+  idpLogout: true,
   secret: getRequiredEnv('SECRET'),
   baseURL,
   clientID: getRequiredEnv('AUTH0_CLIENT_ID'),
@@ -33,19 +36,9 @@ const oidcConfig = {
   },
 };
 
-const jwtConfig = {
+const checkJwt = jwtAuth({
   audience: getRequiredEnv('AUTH0_AUDIENCE'),
   issuerBaseURL: `https://${auth0Domain}`,
-  secret: '',
-  tokenSigningAlg: 'RS256' as const,
-};
-
-const readPasses = jwtAuth({
-  ...jwtConfig,
-});
-
-const createPasses = jwtAuth({
-  ...jwtConfig,
 });
 
 const escapeHtml = (value: string): string =>
@@ -72,18 +65,6 @@ const getPass = async (id: string) => {
     [id],
   );
   return result.rows[0];
-};
-
-const requireLogin = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): void => {
-  if (!req.oidc.isAuthenticated()) {
-    res.redirect('/login');
-    return;
-  }
-  next();
 };
 
 app.use(express.json());
@@ -178,7 +159,7 @@ app.get('/info/:id', async (req, res) => {
   }
 });
 
-app.get('/passes/:id', readPasses, requiredScopes('read:passes'), async (req, res) => {
+app.get('/passes/:id', checkJwt, requiredScopes('read:passes'), async (req, res) => {
   try {
     const pass = await getPass(String(req.params.id));
     if (!pass) {
@@ -198,7 +179,7 @@ app.get('/passes/:id', readPasses, requiredScopes('read:passes'), async (req, re
   }
 });
 
-app.post('/passes', createPasses, requiredScopes('create:passes'), async (req, res) => {
+app.post('/passes', checkJwt, requiredScopes('create:passes'), async (req, res) => {
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const document = typeof req.body?.document === 'string' ? req.body.document.trim() : '';
   if (!name || !document) {
@@ -224,7 +205,7 @@ app.post('/passes', createPasses, requiredScopes('create:passes'), async (req, r
   }
 });
 
-app.post('/passes/:id/cancel', requireLogin, async (req, res) => {
+app.post('/passes/:id/cancel', requiresAuth(), async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE passes
@@ -244,7 +225,7 @@ app.post('/passes/:id/cancel', requireLogin, async (req, res) => {
   }
 });
 
-app.post('/passes/:id/delete', requireLogin, async (req, res) => {
+app.post('/passes/:id/delete', requiresAuth(), async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM passes WHERE id = $1', [req.params.id]);
     if (result.rowCount === 0) {
@@ -258,7 +239,7 @@ app.post('/passes/:id/delete', requireLogin, async (req, res) => {
   }
 });
 
-app.delete('/passes/:id', requireLogin, async (req, res) => {
+app.delete('/passes/:id', requiresAuth(), async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM passes WHERE id = $1', [req.params.id]);
     if (result.rowCount === 0) {

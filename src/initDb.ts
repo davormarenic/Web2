@@ -21,8 +21,10 @@ async function init() {
     console.log('Baza je uspješno inicijalizirana!');
   } catch (err) {
     console.error('Greška pri inicijalizaciji:', err);
+    process.exitCode = 1;
   } finally {
-    process.exit(0);
+    await pool.end();
   }
 }
-init();
+
+void init();
