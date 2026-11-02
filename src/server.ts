@@ -2,7 +2,8 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { auth as jwtAuth, requiredScopes } from 'express-oauth2-jwt-bearer';
 import oidc from 'express-openid-connect';
-const { auth: oidcAuth, requiresAuth } = oidc;import QRCode from 'qrcode';
+const { auth: oidcAuth, requiresAuth } = oidc;
+import QRCode from 'qrcode';
 import { pool } from './db.js';
 import 'dotenv/config';
 
@@ -23,10 +24,14 @@ const baseURL =
   process.env.PUBLIC_BASE_URL ??
   `http://localhost:${port}`;
 
+const sessionSecret = getRequiredEnv('SECRET');
+
+delete process.env.SECRET;
+
 const oidcConfig = {
   authRequired: false,
   idpLogout: true,
-  secret: getRequiredEnv('SECRET'),
+  secret: sessionSecret, // OIDC uredno koristi spremljenu vrijednost
   baseURL,
   clientID: getRequiredEnv('AUTH0_CLIENT_ID'),
   issuerBaseURL: `https://${auth0Domain}`,
